@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { twMerge } from "tailwind-merge";
@@ -107,14 +108,52 @@ const Layout = () => {
     console.log("Changed language to:", lng);
   }, [i18n]);
 
+  // اعتبارسنجی داده‌های initialParameters
+  const validateInitialParameters = (data) => {
+    if (!data.initialParameters) return true; // اگر داده‌ای نباشه، اعتبارسنجی لازم نیست
+    const { power, tubeVoltage, anodeCurrent } = data.initialParameters;
+    if (power && (isNaN(power) || power < 0)) {
+      console.warn("⚠️ اعتبارسنجی ناموفق: توان نامعتبر", power);
+      return false;
+    }
+    if (tubeVoltage && (isNaN(tubeVoltage) || tubeVoltage < 0)) {
+      console.warn("⚠️ اعتبارسنجی ناموفق: ولتاژ تیوب نامعتبر", tubeVoltage);
+      return false;
+    }
+    if (anodeCurrent && (isNaN(anodeCurrent) || anodeCurrent < 0)) {
+      console.warn("⚠️ اعتبارسنجی ناموفق: جریان آند نامعتبر", anodeCurrent);
+      return false;
+    }
+    return true;
+  };
+
   const handleSubmitAll = async () => {
     const allData = getAllFormData();
+    console.log("📋 داده‌های جمع‌آوری‌شده برای ارسال:", allData);
+
     if (Object.keys(allData).length === 0) {
+      console.warn("⚠️ هیچ داده‌ای برای ارسال وجود ندارد");
       setResponse(t("noDataAvailable"));
       Swal.fire({
         title: t("error"),
         text: t("noDataToSubmit"),
         icon: "warning",
+        confirmButtonText: t("ok"),
+        confirmButtonColor: "#16a34a",
+        customClass: {
+          confirmButton: "swal-confirm-button",
+        },
+      });
+      return;
+    }
+
+    // اعتبارسنجی داده‌های initialParameters
+    if (!validateInitialParameters(allData)) {
+      console.warn("⚠️ داده‌های initialParameters نامعتبر هستند");
+      Swal.fire({
+        title: t("error"),
+        text: t("invalidInitialParameters"),
+        icon: "error",
         confirmButtonText: t("ok"),
         confirmButtonColor: "#16a34a",
         customClass: {
@@ -141,17 +180,31 @@ const Layout = () => {
 
     if (result.isConfirmed) {
       const message = `AllFormData:${JSON.stringify(allData)}`;
+      console.log("🚀 پیام ارسالی به بکند:", message);
+
       if (send(message)) {
+        console.log("✅ پیام با موفقیت از طریق WebSocket ارسال شد");
         setResponse(t("sendingData"));
+      } else {
+        console.error("❌ خطا در ارسال پیام از طریق WebSocket");
+        Swal.fire({
+          title: t("error"),
+          text: t("failedToSendData"),
+          icon: "error",
+          confirmButtonText: t("ok"),
+          confirmButtonColor: "#16a34a",
+          customClass: {
+            confirmButton: "swal-confirm-button",
+          },
+        });
       }
     }
-    // اگه لغو کنه، هیچی انجام نمی‌شه
   };
 
   return (
     <div className="flex flex-col md:flex-row min-h-screen gap-4 p-4 bg-background dark:bg-background">
       {/* ستون چپ */}
-      <div className="w-full md:w-1/2 flex flex-col gap-4  ">
+      <div className="w-full md:w-1/2 flex flex-col gap-4">
         <div className="card flex-1 flex flex-col">
           {/* نوار بالا */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary dark:bg-background-secondary dark:border-border rounded-t-xl">
