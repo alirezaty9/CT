@@ -82,26 +82,12 @@ body {
     @apply bg-accent p-4 rounded-lg shadow-inner text-accent-dark font-semibold;
   }
 
-  /* استایل‌های سفارشی برای دکمه‌های SweetAlert2 */
-  .swal-confirm-button {
-    background-color: #16a34a !important; /* سبز تیره */
-    color: white !important; /* متن سفید */
-    border: none !important;
-    transition: background-color 0.3s ease !important;
+  .button-active {
+    @apply bg-primary text-white border-primary shadow-md transition-all duration-150;
   }
 
-  .swal-confirm-button:hover {
-    background-color: #15803d !important; /* سبز کمی تیره‌تر برای هاور */
-  }
-
-  .swal-cancel-button {
-    background-color: #ef4444 !important; /* قرمز ملایم */
-    color: white !important; /* متن سفید */
-    border: none !important;
-    transition: background-color 0.3s ease !important;
-  }
-
-  .swal-cancel-button:hover {
-    background-color: #dc2626 !important; /* قرمز تیره‌تر برای هاور */
+  .no-transition {
+    @apply transition-none;
   }
 }
+

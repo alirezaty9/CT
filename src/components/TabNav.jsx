@@ -7,8 +7,7 @@ const TabNav = ({ tabs }) => {
   const { i18n, t } = useTranslation();
 
   // دیباگ
-  console.log('Current language:', i18n.language);
-  console.log('Translation for initial:', t('initial'));
+
 
   return (
     <div
