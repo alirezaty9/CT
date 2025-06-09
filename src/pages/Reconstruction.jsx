@@ -1,8 +1,13 @@
 import React from "react";
-import { useTranslation } from "react-i18next";
+import ConnectionStatus from "../components/common/ConnectionStatus";
 
+import { Zap,} from 'lucide-react';
+import FormButton from "../components/common/FormButton";
 export default function Reconstruction() {
-  const { t } = useTranslation();
-
-  return <div>{t("reconstruction")}</div>;
+  return (
+    <>
+      <ConnectionStatus icon={Zap}  />
+      <FormButton variant="secondary"/>
+    </>
+  );
 }
