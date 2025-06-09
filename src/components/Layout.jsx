@@ -14,7 +14,7 @@ import {
 import Swal from "sweetalert2";
 import BaslerTools from "./Toolbar";
 import TabNav from "./TabNav";
-import IconButton from "./IconButton";
+import IconButton from "./common/IconButton";
 import { useTranslation } from "react-i18next";
 import { useFormData } from "../contexts/FormDataContext";
 import { useWebSocket } from "../contexts/WebSocketContext";

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import IconButton from "./IconButton";
+import IconButton from "./common/IconButton";
 import { twMerge } from "tailwind-merge";
 import {
   Crop,
