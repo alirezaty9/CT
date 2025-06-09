@@ -152,7 +152,7 @@
    "imageTransform": "Image Transform",
   "none": "None",
   "90degree": "90°",
-  "180degree": "180°", 
+  
   "270degree": "270°",
   "basicOperations": "Basic Operations",
   "normalize": "Normalize",
@@ -185,5 +185,8 @@
   "edgeMethod": "Edge Method",
   "sobel": "Sobel",
   "canny": "Canny",
-  "prewitt": "Prewitt"
+  "prewitt": "Prewitt",
+  "ok": "OK" ,
+"failedToSendData": "Failed to send data" 
+
 }

@@ -1,4 +1,3 @@
-
 {
   "home": "خانه",
   "settings": "تنظیمات",
@@ -32,7 +31,7 @@
   "checkbox1": "چک‌باکس ۱",
   "checkbox2": "چک‌باکس ۲ (پیش‌فرض انتخاب‌شده)",
   "disabledCheckbox": "چک‌باکس (غیرفعال)",
-  "confirm": "تأیید {{label}}",
+  "confirm": "تأیید",
   "disabledInput": "ورودی غیرفعال",
   "inputs": "ورودی‌ها",
   "textInput": "ورودی متنی",
@@ -114,7 +113,7 @@
   "presetStandard": "پیش‌تنظیم استاندارد",
   "presetHighPower": "پیش‌تنظیم قدرت بالا",
   "clearAll": "پاک کردن همه",
-  "voltage": "ولتاژ", 
+  "voltage": "ولتاژ",
   "current": "جریان",
   "active": "فعال",
   "inactive": "غیرفعال",
@@ -129,7 +128,7 @@
   "enterRotateCalibration": "کالیبراسیون چرخشی را وارد کنید",
   "selectedFile": "فایل انتخاب‌شده",
   "enterManipulatorX": "موقعیت X را وارد کنید",
-  "enterManipulatorY": "موقعیت Y را وارد کنید", 
+  "enterManipulatorY": "موقعیت Y را وارد کنید",
   "enterManipulatorZ": "موقعیت Z را وارد کنید",
   "enterManipulatorTheta": "زاویه تتا را وارد کنید",
   "enterManipulatorGamma": "زاویه گاما را وارد کنید",
@@ -141,7 +140,7 @@
   "imageAdjustments": "تنظیمات تصویر",
   "gain": "بهره",
   "offset": "آفست",
-  "preprocess": "پیش‌پردازش", 
+  "preprocess": "پیش‌پردازش",
   "hdr": "HDR",
   "energyLevel1": "سطح انرژی ۱",
   "energyLevel2": "سطح انرژی ۲",
@@ -152,8 +151,7 @@
   "imageTransform": "تبدیل تصویر",
   "none": "هیچ",
   "90degree": "۹۰ درجه",
-  "180degree": "۱۸۰ درجه",
-  "270degree": "۲۷۰ درجه", 
+  "270degree": "۲۷۰ درجه",
   "basicOperations": "عملیات پایه",
   "normalize": "نرمال‌سازی",
   "fft": "تبدیل فوریه",
@@ -166,7 +164,7 @@
   "exportImage": "خروجی تصویر",
   "export": "خروجی",
   "tiff": "TIFF",
-  "jpg": "JPG", 
+  "jpg": "JPG",
   "dicom": "DICOM",
   "imageFilters": "فیلترهای تصویر",
   "medianFilter": "فیلتر میانه",
@@ -185,5 +183,8 @@
   "edgeMethod": "روش تشخیص لبه",
   "sobel": "سوبل",
   "canny": "کنی",
-  "prewitt": "پرویت"
+  "prewitt": "پرویت",
+  "ok": "باشه",
+  "failedToSendData": "ارسال داده ناموفق بود"
+
 }

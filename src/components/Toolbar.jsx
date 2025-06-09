@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import IconButton from "./common/IconButton";
+import { useCamera } from "../contexts/CameraContext"; // ⭐ اضافه شده
 import { twMerge } from "tailwind-merge";
 import {
   Crop,
@@ -27,12 +28,12 @@ const tools = [
 ];
 
 const Toolbar = ({ className = "" }) => {
-  const [activeTool, setActiveTool] = useState(null);
   const { t } = useTranslation();
+  const { activeTool, applyTool } = useCamera(); // ⭐ از CameraContext استفاده می‌کنه
 
   const handleToolClick = (name) => {
-    console.log("Active tool:", name);
-    setActiveTool(name);
+    console.log("🔧 ابزار انتخاب شده:", name);
+    applyTool(name); // ⭐ ارسال به CameraContext
   };
 
   return (
@@ -48,7 +49,7 @@ const Toolbar = ({ className = "" }) => {
           Icon={Icon}
           title={t(name)}
           onClick={() => handleToolClick(name)}
-          variant={activeTool === name ? "primary" : "default"}
+          variant={activeTool === name ? "primary" : "default"} // ⭐ از activeTool Context استفاده می‌کنه
           size="md"
           className="hover:scale-105"
         />

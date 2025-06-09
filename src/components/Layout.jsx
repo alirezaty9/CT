@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { twMerge } from "tailwind-merge";
@@ -18,14 +17,36 @@ import IconButton from "./common/IconButton";
 import { useTranslation } from "react-i18next";
 import { useFormData } from "../contexts/FormDataContext";
 import { useWebSocket } from "../contexts/WebSocketContext";
+import BaslerDisplay from "./Camera/BaslerDisplay";
+import MonitoringDisplay from "./Camera/MonitoringDisplay";
 
 // تب‌های بالا
 const tabs = [
-  { to: "/initial", label: "initial", icon: <LayoutDashboard className="w-4 h-4 mr-1" /> },
-  { to: "/position", label: "position", icon: <Move3D className="w-4 h-4 mr-1" /> },
-  { to: "/projection", label: "projection", icon: <Focus className="w-4 h-4 mr-1" /> },
-  { to: "/post-processing", label: "postProcessing", icon: <Wrench className="w-4 h-4 mr-1" /> },
-  { to: "/reconstruction", label: "reconstruction", icon: <ImagePlus className="w-4 h-4 mr-1" /> },
+  {
+    to: "/initial",
+    label: "initial",
+    icon: <LayoutDashboard className="w-4 h-4 mr-1" />,
+  },
+  {
+    to: "/position",
+    label: "position",
+    icon: <Move3D className="w-4 h-4 mr-1" />,
+  },
+  {
+    to: "/projection",
+    label: "projection",
+    icon: <Focus className="w-4 h-4 mr-1" />,
+  },
+  {
+    to: "/post-processing",
+    label: "postProcessing",
+    icon: <Wrench className="w-4 h-4 mr-1" />,
+  },
+  {
+    to: "/reconstruction",
+    label: "reconstruction",
+    icon: <ImagePlus className="w-4 h-4 mr-1" />,
+  },
 ];
 
 // دکمه انتخاب زبان
@@ -34,7 +55,9 @@ const LanguageButton = ({ lng, current, onClick }) => (
     onClick={() => onClick(lng)}
     className={twMerge(
       "px-2 py-1 text-sm rounded-md",
-      current === lng ? "bg-primary text-white" : "bg-background-secondary text-text-muted"
+      current === lng
+        ? "bg-primary text-white"
+        : "bg-background-secondary text-text-muted"
     )}
   >
     {lng.toUpperCase()}
@@ -43,12 +66,12 @@ const LanguageButton = ({ lng, current, onClick }) => (
 
 // پنل پایین (وضعیت سیستم و دوربین)
 const BottomPanels = ({ t }) => (
-  <div className="h-40 md:h-44 flex gap-4 p-4 pt-0">
+  <div className="h-40 md:h-44 flex gap-4 py-1 px-4 pt-0">
     <div className="panel flex-1 flex items-center justify-center text-sm dark:text-text">
       {t("systemStatus")}
     </div>
-    <div className="panel w-96 flex items-center justify-center text-sm dark:text-text">
-      {t("camera")}
+    <div className="card h-40 md:h-44 border border-black">
+      <MonitoringDisplay />
     </div>
   </div>
 );
@@ -56,12 +79,15 @@ const BottomPanels = ({ t }) => (
 // کامپوننت اصلی Layout
 const Layout = () => {
   const location = useLocation();
-  const defaultActive = location.pathname.includes("settings") ? "Settings" : null;
+  const defaultActive = location.pathname.includes("settings")
+    ? "Settings"
+    : null;
 
   const [activeButton, setActiveButton] = useState(defaultActive);
   const { t, i18n } = useTranslation();
   const { getAllFormData } = useFormData();
-  const { send, isConnected, addMessageCallback, removeMessageCallback } = useWebSocket();
+  const { send, isConnected, addMessageCallback, removeMessageCallback } =
+    useWebSocket();
   const [response, setResponse] = useState("");
 
   useEffect(() => {
@@ -103,14 +129,17 @@ const Layout = () => {
     setActiveButton(name);
   }, []);
 
-  const changeLanguage = useCallback((lng) => {
-    i18n.changeLanguage(lng);
-    console.log("Changed language to:", lng);
-  }, [i18n]);
+  const changeLanguage = useCallback(
+    (lng) => {
+      i18n.changeLanguage(lng);
+      console.log("Changed language to:", lng);
+    },
+    [i18n]
+  );
 
   // اعتبارسنجی داده‌های initialParameters
   const validateInitialParameters = (data) => {
-    if (!data.initialParameters) return true; // اگر داده‌ای نباشه، اعتبارسنجی لازم نیست
+    if (!data.initialParameters) return true;
     const { power, tubeVoltage, anodeCurrent } = data.initialParameters;
     if (power && (isNaN(power) || power < 0)) {
       console.warn("⚠️ اعتبارسنجی ناموفق: توان نامعتبر", power);
@@ -147,7 +176,6 @@ const Layout = () => {
       return;
     }
 
-    // اعتبارسنجی داده‌های initialParameters
     if (!validateInitialParameters(allData)) {
       console.warn("⚠️ داده‌های initialParameters نامعتبر هستند");
       Swal.fire({
@@ -163,7 +191,6 @@ const Layout = () => {
       return;
     }
 
-    // پاپ‌آپ تأیید
     const result = await Swal.fire({
       title: t("areYouSure"),
       icon: "question",
@@ -202,13 +229,15 @@ const Layout = () => {
   };
 
   return (
-    <div className="flex flex-col md:flex-row min-h-screen gap-4 p-4 bg-background dark:bg-background">
-      {/* ستون چپ */}
-      <div className="w-full md:w-1/2 flex flex-col gap-4">
-        <div className="card flex-1 flex flex-col">
-          {/* نوار بالا */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary dark:bg-background-secondary dark:border-border rounded-t-xl">
-            <TabNav tabs={tabs.map((tab) => ({ ...tab, label: t(tab.label) }))} />
+    <div className="flex flex-col md:flex-row min-h-screen max-h-screen gap-4 p-4 bg-background dark:bg-background overflow-hidden">
+      {/* ستون چپ - 2/3 عرض */}
+      <div className="w-full md:w-5/12 flex flex-col gap-4 min-h-0">
+        <div className="card flex-1 flex flex-col min-h-0">
+          {/* نوار بالا - ارتفاع ثابت */}
+          <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 border-b border-border bg-background-secondary dark:bg-background-secondary dark:border-border rounded-t-xl">
+            <TabNav
+              tabs={tabs.map((tab) => ({ ...tab, label: t(tab.label) }))}
+            />
             <div className="flex gap-2 items-center">
               <IconButton
                 Icon={Play}
@@ -233,33 +262,39 @@ const Layout = () => {
             </div>
           </div>
 
-          {/* محتوای مرکزی */}
-          <div className="w-full flex-1 overflow-auto px-6 py-4">
-            <div className="w-full h-full max-h-[calc(100vh-320px)] overflow-auto rounded-md">
+          {/* محتوای مرکزی - flex-1 برای باقی فضا */}
+          <div className="flex-1 min-h-0 px-6 py-4">
+            <div className="h-full overflow-auto rounded-md">
               <Outlet />
             </div>
             {response && <p className="text-green-600 mt-2">{response}</p>}
           </div>
 
-          {/* وضعیت سیستم / دوربین */}
-          <BottomPanels t={t} />
+          {/* وضعیت سیستم / دوربین - ارتفاع ثابت */}
+          <div className="flex-shrink-0">
+            <BottomPanels t={t} />
+          </div>
         </div>
       </div>
 
-      {/* ستون راست */}
-      <div className="w-full md:w-1/2 flex flex-col gap-4">
-        <div className="flex-1 flex flex-col gap-0">
-          <div className="card flex-1 rounded-b-none border-b-0 relative overflow-hidden flex dark:bg-background-white dark:border-border">
+      {/* ستون راست - 1/3 عرض */}
+      <div className="w-full md:w-7/12 flex flex-col gap-4 min-h-0">
+        {/* بخش بالا - تصویر باسلر */}
+        <div className="flex-1 flex flex-col gap-0 min-h-0">
+          <div className="card flex-1 rounded-b-none border-b-0 relative overflow-hidden flex min-h-0">
             <BaslerTools />
-            <div className="flex-1 flex items-center justify-center text-text dark:text-text font-medium">
-              {t("projectionDisplay")}
+            <div className="flex-1 min-h-0">
+              <BaslerDisplay />
             </div>
           </div>
-          <div className="card rounded-t-none border-t-0 text-text dark:text-text font-medium text-center p-4">
+          {/* Image Reel - ارتفاع ثابت */}
+          <div className="card flex-shrink-0 rounded-t-none border-t-0 text-text dark:text-text font-medium text-center p-4">
             {t("imageReel")}
           </div>
         </div>
-        <div className="card h-40 md:h-44 p-4 text-text dark:text-text font-medium text-center">
+        
+        {/* هیستوگرام - ارتفاع ثابت */}
+        <div className="card flex-shrink-0 h-40 md:h-44 p-4 text-text dark:text-text font-medium text-center">
           {t("histogram")}
         </div>
       </div>
