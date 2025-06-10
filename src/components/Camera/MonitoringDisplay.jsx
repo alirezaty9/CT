@@ -3,32 +3,53 @@ import React, { useRef, useEffect } from 'react';
 import { useCamera } from '../../contexts/CameraContext';
 
 const MonitoringDisplay = () => {
-  const videoRef = useRef(null);        // ✅ REF برای video element
-  const { cameras } = useCamera();      // ✅ دریافت اطلاعات دوربین‌ها از Context
+  const imgRef = useRef(null);
+  const { cameras, wsStatus } = useCamera();      // ✅ دریافت اطلاعات دوربین‌ها و وضعیت WebSocket
 
-  // 🔄 EFFECT: وقتی URL تغییر می‌کنه، ویدیو رو به آدرس جدید وصل کن
+  // 🔄 EFFECT: وقتی frame جدید میاد، تصویر رو update کن
   useEffect(() => {
-    if (videoRef.current && cameras.monitoring.streamUrl) {
-      videoRef.current.src = cameras.monitoring.streamUrl;  // ✅ آدرس RTSP رو set کن
-      // ✅ مرورگر خودش مدیریت RTSP رو انجام میده
+    if (imgRef.current && cameras.monitoring.currentFrame) {
+      imgRef.current.src = cameras.monitoring.currentFrame;
     }
-  }, [cameras.monitoring.streamUrl]);
+  }, [cameras.monitoring.currentFrame]);
 
   return (
     <div className="w-full h-full bg-black rounded-lg overflow-hidden relative">
-      {/* 📹 Video element برای RTSP stream */}
-      <video
-        ref={videoRef}
-        className="w-full h-full object-contain"  // ✅ ویدیو رو به سایز container fit کن
-        autoPlay                                  // ✅ خودکار پخش شه
-        muted                                     // ✅ صدا خاموش
-        playsInline                              // ✅ در iOS نه fullscreen بشه
+      {/* 📹 Image element برای نمایش stream */}
+      <img
+        ref={imgRef}
+        className="w-full h-full object-contain"  // ✅ تصویر رو به سایز container fit کن
+        alt="Monitoring Camera"
+        style={{ display: cameras.monitoring.currentFrame ? 'block' : 'none' }}
       />
+      
+      {/* 🔄 Loading state */}
+      {!cameras.monitoring.currentFrame && (
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="text-white text-sm">
+            {wsStatus === 'connecting' ? 'اتصال به دوربین...' : 
+             wsStatus === 'connected' ? 'در انتظار تصویر...' : 
+             'قطع ارتباط با دوربین'}
+          </div>
+        </div>
+      )}
       
       {/* 🏷️ برچسب نام دوربین */}
       <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-sm">
         Monitoring Camera
       </div>
+      
+      {/* 🔴 نمایش وضعیت اتصال */}
+      <div className={`absolute bottom-2 left-2 w-3 h-3 rounded-full ${
+        cameras.monitoring.isConnected && cameras.monitoring.currentFrame ? 'bg-green-500' : 'bg-red-500'
+      }`} />
+      
+      {/* 📊 نمایش FPS (اختیاری) */}
+      {cameras.monitoring.currentFrame && (
+        <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
+          RTSP Live
+        </div>
+      )}
     </div>
   );
 };
