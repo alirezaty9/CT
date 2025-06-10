@@ -210,5 +210,5 @@ const BaslerDisplay = () => {
     </div>
   );
 };
-
+//test
 export default BaslerDisplay;
