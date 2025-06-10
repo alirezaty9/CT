@@ -1,5 +1,5 @@
-// src/contexts/CameraContext.jsx
-import React, { createContext, useContext, useState, useCallback } from 'react';
+// src/contexts/CameraContext.jsx - بهینه شده برای کاهش تاخیر
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 
 const CameraContext = createContext();
 
@@ -7,123 +7,263 @@ export const CameraProvider = ({ children }) => {
   
   // 📷 STATE برای دوربین‌ها
   const [cameras, setCameras] = useState({
-    // دوربین باسلر (5 FPS با Canvas)
     basler: {
-      currentFrame: null,        // ✅ آخرین عکس دریافتی از باسلر
-      isConnected: false,        // ✅ آیا متصل است؟
-      streamUrl: 'ws://localhost:8080/basler'  // ✅ آدرس WebSocket
+      currentFrame: null,
+      isConnected: false,
+      lastUpdate: 0
     },
-    // دوربین مانیتورینگ (RTSP)
     monitoring: {
-      streamUrl: 'rtsp://192.168.1.100:554/stream',  // ✅ آدرس RTSP
-      isConnected: false         // ✅ آیا متصل است؟
+      currentFrame: null,
+      isConnected: false,
+      lastUpdate: 0
     }
   });
 
   // 🛠️ STATE برای ابزارهای Toolbar
-  const [activeTool, setActiveTool] = useState(null);  // ✅ کدوم ابزار فعاله؟ (brush, eraser, circle...)
+  const [activeTool, setActiveTool] = useState(null);
 
   // 🎨 STATE برای نقاشی‌ها
-  const [drawings, setDrawings] = useState([]);        // ✅ لیست همه نقاشی‌های کامل شده
-  const [isDrawing, setIsDrawing] = useState(false);   // ✅ آیا الان داره نقاشی می‌کشه؟
-  const [currentPath, setCurrentPath] = useState([]); // ✅ نقاشی در حال انجام
+  const [drawings, setDrawings] = useState([]);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [currentPath, setCurrentPath] = useState([]);
 
   // 🎛️ STATE برای تنظیمات تصویر
   const [imageSettings, setImageSettings] = useState({
-    brightness: 100,   // ✅ روشنایی (0-200)
-    contrast: 100,     // ✅ کنتراست (0-200) 
-    saturation: 100,   // ✅ اشباع رنگ (0-200)
-    zoom: 1,           // ✅ زوم (0.5 - 5)
-    rotation: 0        // ✅ چرخش (0, 90, 180, 270)
+    brightness: 100,
+    contrast: 100,
+    saturation: 100,
+    zoom: 1,
+    rotation: 0
   });
 
   // 📍 STATE برای موقعیت ماوس
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
 
-  // 🔄 FUNCTION: دریافت frame جدید از باسلر
-  const updateBaslerFrame = useCallback((frameData) => {
-    setCameras(prev => ({
-      ...prev,
-      basler: {
-        ...prev.basler,
-        currentFrame: frameData,  // ✅ عکس جدید رو ذخیره می‌کنه
-        isConnected: true         // ✅ نشون میده که متصله
+  // 🌐 WebSocket connection بهینه شده
+  const wsRef = useRef(null);
+  const reconnectTimeoutRef = useRef(null);
+  const [wsStatus, setWsStatus] = useState('disconnected');
+  
+  // بهینه‌سازی performance
+  const frameBufferRef = useRef(new Map()); // cache برای frame ها
+  const lastFrameTimeRef = useRef(new Map()); // آخرین زمان دریافت frame
+
+  // 🔄 WebSocket Setup بهینه شده
+  useEffect(() => {
+    const connectWebSocket = () => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        return;
       }
-    }));
+
+      setWsStatus('connecting');
+      console.log('🔄 اتصال سریع به WebSocket...');
+      
+      const ws = new WebSocket('ws://localhost:12345');
+      
+      // تنظیمات بهینه برای کاهش تاخیر
+      ws.binaryType = 'arraybuffer';
+      
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        setWsStatus('connected');
+        console.log('✅ WebSocket با تاخیر کم متصل شد');
+        
+        setCameras(prev => ({
+          basler: { ...prev.basler, isConnected: true },
+          monitoring: { ...prev.monitoring, isConnected: true }
+        }));
+
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
+        }
+      };
+
+      ws.onmessage = (event) => {
+        const now = performance.now(); // استفاده از performance.now برای دقت بالا
+        
+        try {
+          const message = event.data;
+          
+          if (message.startsWith('response:')) {
+            console.log('📨 Response:', message.slice(9));
+            return;
+          }
+
+          const colonIndex = message.indexOf(':');
+          if (colonIndex === -1) return;
+
+          const channel = message.substring(0, colonIndex);
+          const base64Data = message.substring(colonIndex + 1);
+          
+          if (!base64Data) return;
+
+          // چک کردن تاخیر بین frame ها
+          const lastTime = lastFrameTimeRef.current.get(channel) || 0;
+          const timeDiff = now - lastTime;
+          
+          // اگر frame خیلی سریع آمده، skip کن (throttling)
+          if (timeDiff < 16 && lastTime > 0) { // حداکثر 60 FPS
+            return;
+          }
+          
+          lastFrameTimeRef.current.set(channel, now);
+
+          // ایجاد data URL بهینه
+          const frameData = `data:image/jpeg;base64,${base64Data}`;
+          
+          // به‌روزرسانی state بهینه
+          setCameras(prev => {
+            const newState = { ...prev };
+            
+            if (channel === 'basler') {
+              newState.basler = {
+                currentFrame: frameData,
+                isConnected: true,
+                lastUpdate: Date.now()
+              };
+            } else if (channel === 'monitoring') {
+              newState.monitoring = {
+                currentFrame: frameData,
+                isConnected: true,
+                lastUpdate: Date.now()
+              };
+            }
+            
+            return newState;
+          });
+
+          // console.log برای debug (اختیاری)
+          if (timeDiff > 100) { // فقط اگر تاخیر زیاد باشد
+            console.log(`⚠️ High latency for ${channel}: ${timeDiff.toFixed(1)}ms`);
+          }
+          
+        } catch (error) {
+          console.error('❌ خطا در پردازش سریع پیام:', error);
+        }
+      };
+
+      ws.onclose = (event) => {
+        setWsStatus('disconnected');
+        console.log('❌ WebSocket قطع شد');
+        
+        setCameras(prev => ({
+          basler: { ...prev.basler, isConnected: false },
+          monitoring: { ...prev.monitoring, isConnected: false }
+        }));
+
+        // اتصال مجدد سریع‌تر
+        if (!reconnectTimeoutRef.current) {
+          reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectTimeoutRef.current = null;
+            connectWebSocket();
+          }, 1000); // 1 ثانیه به جای 3 ثانیه
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('❌ WebSocket error:', error);
+        setWsStatus('disconnected');
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
+    };
   }, []);
 
-  // 🔧 FUNCTION: فعال‌سازی ابزار از Toolbar
+  // 🔄 FUNCTION: deprecated
+  const updateBaslerFrame = useCallback(() => {
+    console.warn('⚠️ updateBaslerFrame is deprecated');
+  }, []);
+
+  // 🔧 FUNCTION: فعال‌سازی ابزار
   const applyTool = useCallback((toolName) => {
-    setActiveTool(toolName);  // ✅ ابزار انتخاب شده رو ذخیره می‌کنه
+    setActiveTool(toolName);
     console.log(`🔧 ابزار فعال شد: ${toolName}`);
   }, []);
 
-  // 🖱️ FUNCTION: شروع نقاشی (Mouse Down)
+  // 🖱️ FUNCTION: شروع نقاشی (بهینه شده)
   const startDrawing = useCallback((x, y) => {
-    if (!activeTool || activeTool === 'move') return;  // ✅ اگه ابزاری انتخاب نشده، کاری نکن
+    if (!activeTool || activeTool === 'move') return;
     
-    setIsDrawing(true);           // ✅ شروع نقاشی
-    setCurrentPath([{ x, y }]);   // ✅ اولین نقطه رو ذخیره کن
+    setIsDrawing(true);
+    setCurrentPath([{ x, y }]);
   }, [activeTool]);
 
-  // 🖱️ FUNCTION: ادامه نقاشی (Mouse Move)  
+  // 🖱️ FUNCTION: ادامه نقاشی (بهینه شده با throttling)
   const continueDrawing = useCallback((x, y) => {
-    setCursorPosition({ x, y });  // ✅ همیشه موقعیت ماوس رو update کن
+    setCursorPosition({ x, y });
     
-    if (!isDrawing || !activeTool) return;  // ✅ اگه داره نقاشی نمی‌کشه، فقط cursor رو update کن
+    if (!isDrawing || !activeTool) return;
     
-    setCurrentPath(prev => [...prev, { x, y }]);  // ✅ نقطه جدید رو به مسیر اضافه کن
+    // throttling برای performance بهتر
+    setCurrentPath(prev => {
+      const lastPoint = prev[prev.length - 1];
+      if (lastPoint) {
+        const distance = Math.sqrt(Math.pow(x - lastPoint.x, 2) + Math.pow(y - lastPoint.y, 2));
+        if (distance < 2) return prev; // skip اگر فاصله کم باشد
+      }
+      return [...prev, { x, y }];
+    });
   }, [isDrawing, activeTool]);
 
-  // 🖱️ FUNCTION: پایان نقاشی (Mouse Up)
+  // 🖱️ FUNCTION: پایان نقاشی
   const finishDrawing = useCallback(() => {
-    if (!isDrawing || currentPath.length === 0) return;  // ✅ اگه داره نقاشی نمی‌کشه، کاری نکن
+    if (!isDrawing || currentPath.length === 0) return;
     
-    // ✅ نقاشی کامل شده رو به لیست اضافه کن
     const newDrawing = {
-      id: Date.now(),              // ✅ ID یکتا
-      tool: activeTool,            // ✅ کدوم ابزار استفاده شده
-      path: currentPath,           // ✅ مسیر کشیده شده
-      settings: { ...imageSettings }  // ✅ تنظیمات تصویر در اون لحظه
+      id: Date.now(),
+      tool: activeTool,
+      path: currentPath,
+      settings: { ...imageSettings }
     };
     
-    setDrawings(prev => [...prev, newDrawing]);  // ✅ به لیست نقاشی‌ها اضافه کن
-    setIsDrawing(false);                         // ✅ پایان نقاشی
-    setCurrentPath([]);                          // ✅ مسیر فعلی رو پاک کن
+    setDrawings(prev => [...prev, newDrawing]);
+    setIsDrawing(false);
+    setCurrentPath([]);
   }, [isDrawing, currentPath, activeTool, imageSettings]);
 
   // 🗑️ FUNCTION: پاک کردن همه نقاشی‌ها
   const clearDrawings = useCallback(() => {
-    setDrawings([]);       // ✅ همه نقاشی‌ها رو پاک کن
-    setCurrentPath([]);    // ✅ نقاشی فعلی رو پاک کن
-    setIsDrawing(false);   // ✅ حالت نقاشی رو خاموش کن
+    setDrawings([]);
+    setCurrentPath([]);
+    setIsDrawing(false);
   }, []);
 
   // 🎛️ FUNCTION: تغییر تنظیمات تصویر
   const updateImageSettings = useCallback((newSettings) => {
-    setImageSettings(prev => ({ ...prev, ...newSettings }));  // ✅ تنظیمات جدید رو merge کن
+    setImageSettings(prev => ({ ...prev, ...newSettings }));
   }, []);
 
-  // 📦 همه چیزی که به بقیه کامپوننت‌ها میدیم
+  // 📦 Value object بهینه شده
   const value = {
-    // STATE ها
-    cameras,              // ✅ اطلاعات دوربین‌ها
-    activeTool,           // ✅ ابزار فعال
-    drawings,             // ✅ نقاشی‌های تمام شده
-    isDrawing,            // ✅ آیا داره نقاشی می‌کشه؟
-    currentPath,          // ✅ نقاشی در حال انجام
-    imageSettings,        // ✅ تنظیمات تصویر
-    cursorPosition,       // ✅ موقعیت ماوس
+    cameras,
+    activeTool,
+    drawings,
+    isDrawing,
+    currentPath,
+    imageSettings,
+    cursorPosition,
+    wsStatus,
     
-    // FUNCTION ها
-    updateBaslerFrame,    // ✅ برای دریافت frame جدید
-    applyTool,           // ✅ برای Toolbar
-    startDrawing,        // ✅ برای Canvas
-    continueDrawing,     // ✅ برای Canvas  
-    finishDrawing,       // ✅ برای Canvas
-    clearDrawings,       // ✅ برای پاک کردن
-    updateImageSettings, // ✅ برای تنظیمات
-    setActiveTool        // ✅ برای تغییر مستقیم ابزار
+    updateBaslerFrame,
+    applyTool,
+    startDrawing,
+    continueDrawing,
+    finishDrawing,
+    clearDrawings,
+    updateImageSettings,
+    setActiveTool
   };
 
   return (
@@ -133,7 +273,6 @@ export const CameraProvider = ({ children }) => {
   );
 };
 
-// 🪝 HOOK برای استفاده در کامپوننت‌ها
 export const useCamera = () => {
   const context = useContext(CameraContext);
   if (!context) {

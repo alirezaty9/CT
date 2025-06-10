@@ -19,7 +19,8 @@ const BaslerDisplay = () => {
     cursorPosition,    // ✅ موقعیت ماوس
     startDrawing,      // ✅ تابع شروع نقاشی
     continueDrawing,   // ✅ تابع ادامه نقاشی
-    finishDrawing      // ✅ تابع پایان نقاشی
+    finishDrawing,     // ✅ تابع پایان نقاشی
+    wsStatus           // ✅ وضعیت WebSocket
   } = useCamera();
 
   // 🎨 FUNCTION: رسم همه چیز روی Canvas
@@ -138,6 +139,16 @@ const BaslerDisplay = () => {
     redrawCanvas();
   }, [redrawCanvas]);
 
+  // 🕰️ FUNCTION: تبدیل timestamp به زمان قابل خواندن
+  const formatLastUpdate = (timestamp) => {
+    if (!timestamp) return 'No data';
+    try {
+      return new Date(timestamp).toLocaleTimeString();
+    } catch (error) {
+      return 'Invalid time';
+    }
+  };
+
   return (
     <div 
       ref={containerRef}
@@ -162,6 +173,17 @@ const BaslerDisplay = () => {
         onMouseLeave={handleMouseUp}    // ✅ اگه ماوس از Canvas خارج شد، نقاشی رو تمام کن
       />
       
+      {/* 🔄 Loading state */}
+      {!cameras.basler.currentFrame && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-white text-sm">
+            {wsStatus === 'connecting' ? 'اتصال به باسلر...' : 
+             wsStatus === 'connected' ? 'در انتظار تصویر باسلر...' : 
+             'قطع ارتباط با باسلر'}
+          </div>
+        </div>
+      )}
+      
       {/* 📍 نمایش موقعیت ماوس */}
       <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-sm font-mono">
         X: {Math.round(cursorPosition.x)} | Y: {Math.round(cursorPosition.y)}
@@ -176,8 +198,15 @@ const BaslerDisplay = () => {
       
       {/* 🔴 نمایش وضعیت اتصال */}
       <div className={`absolute bottom-2 left-2 w-3 h-3 rounded-full ${
-        cameras.basler.isConnected ? 'bg-green-500' : 'bg-red-500'
+        cameras.basler.isConnected && cameras.basler.currentFrame ? 'bg-green-500' : 'bg-red-500'
       }`} />
+      
+      {/* 📊 نمایش زمان آخرین به‌روزرسانی */}
+      {cameras.basler.lastUpdate && (
+        <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
+          {formatLastUpdate(cameras.basler.lastUpdate)}
+        </div>
+      )}
     </div>
   );
 };
