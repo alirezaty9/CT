@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
-import BrushTool from './BrushTool';
-import EraserTool from './EraserTool';
-import LineTool from './LineTool';
-import MoveTool from './MoveTool';
+import BrushTool from './BrushTool.jsx';
+import EraserTool from './EraserTool.jsx';
+import LineTool from './LineTool.jsx';
+import MoveTool from './MoveTool.jsx';
+import CropTool from './CropTool.jsx';
 
 const ToolManager = ({ 
   canvas, 
@@ -11,6 +12,7 @@ const ToolManager = ({
   toolSettings = {} 
 }) => {
   const eraserToolRef = useRef(null);
+  const cropToolRef = useRef(null);
   const renderTool = () => {
     switch (activeTool) {
       case 'brush':
@@ -27,6 +29,15 @@ const ToolManager = ({
         return (
           <EraserTool
             ref={eraserToolRef}
+            canvas={canvas}
+            isActive={true}
+          />
+        );
+        
+      case 'crop':
+        return (
+          <CropTool
+            ref={cropToolRef}
             canvas={canvas}
             isActive={true}
           />
@@ -66,6 +77,36 @@ const ToolManager = ({
       {/* Tool Selection */}
       <div className="mb-4">
         <div className="flex gap-2 mb-2">
+          <button
+            onClick={() => {
+              if (activeTool === 'crop' && cropToolRef.current) {
+                // If crop is already active, toggle its panel
+                cropToolRef.current.togglePanel();
+              } else {
+                // If crop is not active, activate it
+                onToolChange('crop');
+              }
+            }}
+            onDoubleClick={() => {
+              if (activeTool === 'crop' && cropToolRef.current) {
+                cropToolRef.current.togglePanel();
+              }
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              if (activeTool === 'crop' && cropToolRef.current) {
+                cropToolRef.current.togglePanel();
+              }
+            }}
+            className={`px-3 py-2 rounded text-sm ${
+              activeTool === 'crop' 
+                ? 'bg-orange-500 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+            title={activeTool === 'crop' ? 'Click to toggle settings | Double-click/Right-click for menu' : 'Click to activate crop'}
+          >
+            🔲 Crop
+          </button>
           <button
             onClick={() => onToolChange('brush')}
             className={`px-3 py-2 rounded text-sm ${

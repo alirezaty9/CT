@@ -122,8 +122,40 @@ const BaslerDisplay = () => {
   // Simple tool setup - now handled by individual tool components
   const setupFabricTools = useCallback((canvas) => {
     if (!canvas) return;
-    console.log('🔧 Canvas initialized for tool components');
-  }, []);
+    
+    // Reset canvas settings
+    canvas.isDrawingMode = false;
+    canvas.selection = true;
+    canvas.defaultCursor = 'default';
+    canvas.hoverCursor = 'move';
+    
+    // Configure canvas based on active tool
+    if (activeTool === 'crop') {
+      console.log('🔲 Configuring crop tool in BaslerDisplay...');
+      canvas.selection = false;
+      canvas.defaultCursor = 'crosshair';
+      canvas.hoverCursor = 'crosshair';
+      console.log('🔲 Crop tool configured in BaslerDisplay');
+    } else if (activeTool === 'eraser') {
+      canvas.selection = false;
+      canvas.defaultCursor = 'crosshair';
+      canvas.hoverCursor = 'crosshair';
+      console.log('🧹 Eraser tool configured');
+    } else if (activeTool === 'move') {
+      canvas.selection = true;
+      canvas.defaultCursor = 'default';
+      canvas.hoverCursor = 'move';
+      console.log('✋ Move tool configured');
+    } else if (activeTool === 'brush' || activeTool === 'line') {
+      canvas.isDrawingMode = true;
+      canvas.selection = false;
+      canvas.defaultCursor = 'crosshair';
+      canvas.hoverCursor = 'crosshair';
+      console.log('🖌️ Drawing tool configured:', activeTool);
+    }
+    
+    console.log('🔧 Canvas initialized for tool components - Active tool:', activeTool);
+  }, [activeTool]);
 
   // همگام‌سازی ابزار فعال با Fabric.js
   useEffect(() => {

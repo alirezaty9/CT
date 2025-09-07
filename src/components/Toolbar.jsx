@@ -29,8 +29,27 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ToolManager } from './Tools';
-import { BrushTool, LineTool, MoveTool } from './Tools';
+import { BrushTool, LineTool, MoveTool, CropTool } from './Tools';
 import EraseToolComponent from './Tools/EraseToolComponent';
+
+// CSS for hiding scrollbar
+const scrollbarHideStyle = `
+  .scrollbar-hide {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, and Opera */
+  }
+`;
+
+// Add the styles to head if not already added
+if (typeof document !== 'undefined' && !document.getElementById('scrollbar-hide-styles')) {
+  const styleElement = document.createElement('style');
+  styleElement.id = 'scrollbar-hide-styles';
+  styleElement.textContent = scrollbarHideStyle;
+  document.head.appendChild(styleElement);
+}
 
 const tools = [
   { Icon: Crop, name: 'crop', hotkey: 'c', category: 'edit' },
@@ -213,7 +232,7 @@ const Toolbar = ({ className = '' }) => {
       </div>
 
       {/* Tools */}
-      <div className="flex-1 py-4 overflow-y-auto">
+      <div className="flex-1 py-4 overflow-y-auto scrollbar-hide">
         <div className={`flex ${isExpanded ? 'flex-col gap-2 px-3' : 'flex-col items-center gap-4 px-2'}`}>
           {tools.map(({ Icon, name, hotkey, category }, index) => {
             const isActive = activeTool === name;
@@ -510,7 +529,7 @@ const Toolbar = ({ className = '' }) => {
           {activeTool === 'brush' && (
             <BrushTool
               canvas={canvas}
-              isActive={true}
+              isActive={activeTool === 'brush'}
               brushColor={selectedColor}
               brushWidth={brushSize}
             />
@@ -518,7 +537,7 @@ const Toolbar = ({ className = '' }) => {
           {activeTool === 'line' && (
             <LineTool
               canvas={canvas}
-              isActive={true}
+              isActive={activeTool === 'line'}
               lineColor={selectedColor}
               lineWidth={brushSize}
             />
@@ -526,9 +545,19 @@ const Toolbar = ({ className = '' }) => {
           {activeTool === 'move' && (
             <MoveTool
               canvas={canvas}
-              isActive={true}
+              isActive={activeTool === 'move'}
             />
           )}
+        </div>
+      )}
+      
+      {/* Crop Tool - Visible when active */}
+      {activeTool === 'crop' && canvas && (
+        <div className="absolute left-full top-0 ml-2 z-50">
+          <CropTool
+            canvas={canvas}
+            isActive={activeTool === 'crop'}
+          />
         </div>
       )}
     </motion.div>
