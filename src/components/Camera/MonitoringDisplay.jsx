@@ -23,13 +23,23 @@ const MonitoringDisplay = () => {
         style={{ display: cameras.monitoring.currentFrame ? 'block' : 'none' }}
       />
       
-      {/* 🔄 Loading state */}
+      {/* 🔄 Enhanced loading state with better status messages */}
       {!cameras.monitoring.currentFrame && (
         <div className="w-full h-full flex items-center justify-center">
-          <div className="text-white text-sm">
-            {wsStatus === 'connecting' ? 'اتصال به دوربین...' : 
-             wsStatus === 'connected' ? 'در انتظار تصویر...' : 
-             'قطع ارتباط با دوربین'}
+          <div className="text-center">
+            <div className="text-white text-sm mb-2">
+              {wsStatus === 'connecting' && '🔄 اتصال به دوربین RTSP...'}
+              {wsStatus === 'connected' && '⏳ در انتظار تصویر RTSP...'}
+              {wsStatus === 'reconnecting' && '🔄 تلاش برای اتصال مجدد...'}
+              {wsStatus === 'error' && '❌ خطا در اتصال RTSP'}
+              {wsStatus === 'failed' && '❌ اتصال RTSP ناموفق'}
+              {wsStatus === 'disconnected' && '⚠️ قطع ارتباط با دوربین'}
+            </div>
+            {(wsStatus === 'error' || wsStatus === 'failed') && (
+              <div className="text-gray-400 text-xs">
+                بررسی تنظیمات RTSP یا بک‌اند
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -44,10 +54,15 @@ const MonitoringDisplay = () => {
         cameras.monitoring.isConnected && cameras.monitoring.currentFrame ? 'bg-green-500' : 'bg-red-500'
       }`} />
       
-      {/* 📊 نمایش FPS (اختیاری) */}
+      {/* 📊 نمایش اطلاعات عملکرد */}
       {cameras.monitoring.currentFrame && (
-        <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs">
-          RTSP Live
+        <div className="absolute bottom-2 right-2 bg-black/70 text-white px-2 py-1 rounded text-xs space-y-1">
+          <div>RTSP Live</div>
+          {cameras.monitoring.avgFps > 0 && (
+            <div className="text-green-400">
+              FPS: {cameras.monitoring.avgFps} | Frames: {cameras.monitoring.frameCount}
+            </div>
+          )}
         </div>
       )}
     </div>

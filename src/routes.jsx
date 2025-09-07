@@ -7,6 +7,7 @@ import PostProcessing from "./pages/PostProcessing";
 import Reconstruction from "./pages/Reconstruction";
 import Layout from "./components/Layout";
 import SettingsPage from "./pages/SettingsPage"; // صفحه جدید
+import CanvasTest from "./pages/CanvasTest"; // صفحه تست Canvas
 
 
 const routes = [
@@ -22,6 +23,7 @@ const routes = [
       { path: "reconstruction", element: <Reconstruction /> },
      
       { path: "settings", element: <SettingsPage /> }, // مسیر جدید
+      { path: "canvas-test", element: <CanvasTest /> }, // تست Canvas پیشرفته
       
     ],
   },

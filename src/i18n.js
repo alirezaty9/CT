@@ -27,7 +27,9 @@ i18n
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
     },
-    debug: true,
+    debug: process.env.NODE_ENV === 'development' ? false : false, // Disable debug in all environments
+    saveMissing: false, // Don't save missing translations
+    missingKeyHandler: false, // Disable missing key warnings in console
   })
   .catch((error) => {
     console.error('i18next initialization error:', error);

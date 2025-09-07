@@ -19,6 +19,7 @@
   "circle": "Circle",
   "rectangle": "Rectangle",
   "lineChart": "Line Chart",
+  "line": "Line",
   "move": "Move",
   "zoomIn": "Zoom In",
   "zoomOut": "Zoom Out",
@@ -186,7 +187,9 @@
   "sobel": "Sobel",
   "canny": "Canny",
   "prewitt": "Prewitt",
-  "ok": "OK" ,
-"failedToSendData": "Failed to send data" 
-
+  "ok": "OK",
+  "failedToSendData": "Failed to send data",
+  "grayscale": "Grayscale",
+  "pan": "Pan",
+  "undo": "Undo"
 }

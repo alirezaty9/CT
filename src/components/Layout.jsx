@@ -9,6 +9,7 @@ import {
   Wrench,
   Play,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import Swal from "sweetalert2";
 import BaslerTools from "./Toolbar";
@@ -92,7 +93,7 @@ const Layout = () => {
 
   useEffect(() => {
     const handleMessage = (message) => {
-      console.log("📬 پاسخ از WebSocket:", message);
+      // console.log("📬 پاسخ از WebSocket:", message);
       if (message.startsWith("response:")) {
         const content = message.slice("response:".length);
         setResponse(content);

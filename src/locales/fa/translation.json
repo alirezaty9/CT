@@ -18,6 +18,7 @@
   "circle": "دایره",
   "rectangle": "مستطیل",
   "lineChart": "نمودار خطی",
+  "line": "خط",
   "move": "جابجایی",
   "zoomIn": "بزرگنمایی",
   "zoomOut": "کوچک‌نمایی",
@@ -185,6 +186,8 @@
   "canny": "کنی",
   "prewitt": "پرویت",
   "ok": "باشه",
-  "failedToSendData": "ارسال داده ناموفق بود"
-
+  "failedToSendData": "ارسال داده ناموفق بود",
+  "grayscale": "سیاه و سفید",
+  "pan": "حرکت",
+  "undo": "بازگشت"
 }
