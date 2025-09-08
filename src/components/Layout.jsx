@@ -293,7 +293,7 @@ const Layout = () => {
             {t("imageReel")}
           </div>
         </div>
-        
+
         {/* هیستوگرام - ارتفاع ثابت */}
         <div className="card flex-shrink-0 h-40 md:h-44 p-4 text-text dark:text-text font-medium text-center">
           {t("histogram")}
