@@ -5,159 +5,164 @@ import {
   Check,
   X,
   Square,
-  Maximize
+  Maximize,
+  Undo2
 } from 'lucide-react';
 
 const CropTool = forwardRef(({ canvas, isActive }, ref) => {
   const [showPanel, setShowPanel] = useState(false);
   const [cropMode, setCropMode] = useState(false);
-  const [cropBox, setCropBox] = useState(null);
   const [aspectRatio, setAspectRatio] = useState('free');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPoint, setStartPoint] = useState(null);
+  const [originalState, setOriginalState] = useState(null);
+  const [canUndo, setCanUndo] = useState(false);
   
   const cropRectRef = useRef(null);
-  const originalImageRef = useRef(null);
   const overlaysRef = useRef([]);
 
-  // Find the largest image on canvas
-  const findLargestImage = useCallback(() => {
-    if (!canvas) return null;
+  // Save original image state
+  const saveOriginalState = useCallback(() => {
+    if (!canvas?.backgroundImage) return;
     
-    const objects = canvas.getObjects();
-    let largestImage = null;
-    let largestArea = 0;
+    const bgImage = canvas.backgroundImage;
+    const imgElement = bgImage._element || bgImage._originalElement;
+    if (!imgElement) return;
     
-    objects.forEach(obj => {
-      if (obj.type === 'image') {
-        const area = obj.width * obj.height;
-        if (area > largestArea) {
-          largestArea = area;
-          largestImage = obj;
-        }
-      }
+    setOriginalState({
+      src: imgElement.src,
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      imageScaleX: bgImage.scaleX,
+      imageScaleY: bgImage.scaleY,
+      imageLeft: bgImage.left,
+      imageTop: bgImage.top
     });
-    
-    return largestImage;
+    setCanUndo(true);
   }, [canvas]);
+
+  // Undo crop
+  const undoCrop = useCallback(() => {
+    if (!canvas || !originalState) return;
+    
+    // Restore canvas size
+    canvas.setWidth(originalState.canvasWidth);
+    canvas.setHeight(originalState.canvasHeight);
+    
+    const htmlCanvas = canvas.getElement();
+    if (htmlCanvas) {
+      htmlCanvas.width = originalState.canvasWidth;
+      htmlCanvas.height = originalState.canvasHeight;
+      htmlCanvas.style.width = `${originalState.canvasWidth}px`;
+      htmlCanvas.style.height = `${originalState.canvasHeight}px`;
+    }
+    
+    // Restore background image
+    fabric.Image.fromURL(originalState.src, (img) => {
+      img.set({
+        left: originalState.imageLeft,
+        top: originalState.imageTop,
+        scaleX: originalState.imageScaleX,
+        scaleY: originalState.imageScaleY,
+        selectable: false,
+        evented: false
+      });
+      
+      canvas.setBackgroundImage(img, () => {
+        canvas.renderAll();
+        setCanUndo(false);
+        setOriginalState(null);
+        
+        // Dispatch resize event
+        window.dispatchEvent(new CustomEvent('canvasResized', {
+          detail: { width: originalState.canvasWidth, height: originalState.canvasHeight, canvas }
+        }));
+      });
+    });
+  }, [canvas, originalState]);
 
   // Remove crop box and overlays
   const removeCropBox = useCallback(() => {
     if (cropRectRef.current && canvas) {
-      // Remove overlays
-      overlaysRef.current.forEach(overlay => {
-        canvas.remove(overlay);
-      });
+      overlaysRef.current.forEach(overlay => canvas.remove(overlay));
       overlaysRef.current = [];
-      
-      // Remove crop box
       canvas.remove(cropRectRef.current);
       cropRectRef.current = null;
       canvas.renderAll();
     }
   }, [canvas]);
 
-  // Update overlays when crop box changes
-  const updateOverlays = useCallback(() => {
-    if (!cropRectRef.current || !originalImageRef.current || !canvas) return;
+  // Create overlays
+  const createOverlays = useCallback((cropRect) => {
+    if (!canvas) return;
     
-    const cropRect = cropRectRef.current;
-    const targetImage = originalImageRef.current;
-    
-    // Get bounds - handle both background and regular images
-    let bounds;
-    if (targetImage === canvas.backgroundImage) {
-      bounds = {
-        left: 0,
-        top: 0,
-        width: canvas.width,
-        height: canvas.height
-      };
-    } else {
-      bounds = targetImage.getBoundingRect();
-    }
-    
-    // Update overlay positions and sizes
-    if (overlaysRef.current && overlaysRef.current.length === 4) {
-      const [overlay1, overlay2, overlay3, overlay4] = overlaysRef.current;
+    const bounds = { left: 0, top: 0, width: canvas.width, height: canvas.height };
+      const actualWidth = cropRect.width * cropRect.scaleX;
+      const actualHeight = cropRect.height * cropRect.scaleY;
       
-      // Top overlay
-      overlay1.set({
+    const overlays = [
+      // Top
+      new fabric.Rect({
         left: bounds.left,
         top: bounds.top,
         width: bounds.width,
-        height: Math.max(0, cropRect.top - bounds.top)
-      });
-      
-      // Bottom overlay
-      overlay2.set({
+        height: Math.max(0, cropRect.top - bounds.top),
+        fill: 'rgba(0,0,0,0.5)',
+        selectable: false,
+        evented: false,
+        excludeFromExport: true
+      }),
+      // Bottom
+      new fabric.Rect({
         left: bounds.left,
-        top: cropRect.top + cropRect.height * cropRect.scaleY,
+        top: cropRect.top + actualHeight,
         width: bounds.width,
-        height: Math.max(0, bounds.top + bounds.height - (cropRect.top + cropRect.height * cropRect.scaleY))
-      });
-      
-      // Left overlay
-      overlay3.set({
+        height: Math.max(0, bounds.height - (cropRect.top + actualHeight)),
+        fill: 'rgba(0,0,0,0.5)',
+        selectable: false,
+        evented: false,
+        excludeFromExport: true
+      }),
+      // Left
+      new fabric.Rect({
         left: bounds.left,
         top: cropRect.top,
         width: Math.max(0, cropRect.left - bounds.left),
-        height: cropRect.height * cropRect.scaleY
-      });
-      
-      // Right overlay
-      overlay4.set({
-        left: cropRect.left + cropRect.width * cropRect.scaleX,
+        height: actualHeight,
+        fill: 'rgba(0,0,0,0.5)',
+        selectable: false,
+        evented: false,
+        excludeFromExport: true
+      }),
+      // Right
+      new fabric.Rect({
+        left: cropRect.left + actualWidth,
         top: cropRect.top,
-        width: Math.max(0, bounds.left + bounds.width - (cropRect.left + cropRect.width * cropRect.scaleX)),
-        height: cropRect.height * cropRect.scaleY
-      });
-      
-      canvas.renderAll();
-    }
+        width: Math.max(0, bounds.width - (cropRect.left + actualWidth)),
+        height: actualHeight,
+        fill: 'rgba(0,0,0,0.5)',
+        selectable: false,
+        evented: false,
+        excludeFromExport: true
+      })
+    ];
+    
+    overlays.forEach(overlay => canvas.add(overlay));
+    overlaysRef.current = overlays;
   }, [canvas]);
 
-  // Create crop box overlay
-  const createCropBox = useCallback((targetImage) => {
-    if (!targetImage || !canvas) {
-      console.warn('❌ createCropBox: No target image or canvas provided');
-      return;
-    }
+  // Create crop box
+  const createCropBox = useCallback((x, y, width, height) => {
+    if (!canvas) return;
     
-    console.log('🔲 createCropBox called with:', targetImage);
-    
-    // Remove existing crop box
     removeCropBox();
-    
-    // Get image bounds - handle both background and regular images
-    let bounds;
-    if (targetImage === canvas.backgroundImage) {
-      // For background images, use canvas dimensions
-      bounds = {
-        left: 0,
-        top: 0,
-        width: canvas.width,
-        height: canvas.height
-      };
-    } else {
-      bounds = targetImage.getBoundingRect();
-    }
-    
-    console.log('🔲 Image bounds:', bounds);
-    
-    const cropWidth = Math.min(bounds.width * 0.8, 300);
-    const cropHeight = aspectRatio === 'free' ? cropWidth * 0.75 : 
-                     aspectRatio === 'square' ? cropWidth :
-                     aspectRatio === '16:9' ? cropWidth * 9/16 :
-                     aspectRatio === '4:3' ? cropWidth * 3/4 :
-                     cropWidth * 0.75;
-    
-    console.log('🔲 Crop dimensions:', { cropWidth, cropHeight, aspectRatio });
     
     // Create crop rectangle
     cropRectRef.current = new fabric.Rect({
-      left: bounds.left + (bounds.width - cropWidth) / 2,
-      top: bounds.top + (bounds.height - cropHeight) / 2,
-      width: cropWidth,
-      height: cropHeight,
+      left: x,
+      top: y,
+      width: width,
+      height: height,
       fill: 'transparent',
       stroke: '#007bff',
       strokeWidth: 2,
@@ -171,305 +176,214 @@ const CropTool = forwardRef(({ canvas, isActive }, ref) => {
       transparentCorners: false
     });
     
-    // Add crop overlay (dark areas)
-    const overlay1 = new fabric.Rect({
-      left: bounds.left,
-      top: bounds.top,
-      width: bounds.width,
-      height: cropRectRef.current.top - bounds.top,
-      fill: 'rgba(0,0,0,0.5)',
-      selectable: false,
-      evented: false,
-      excludeFromExport: true
-    });
+    canvas.add(cropRectRef.current);
+    createOverlays(cropRectRef.current);
     
-    const overlay2 = new fabric.Rect({
-      left: bounds.left,
-      top: cropRectRef.current.top + cropRectRef.current.height,
-      width: bounds.width,
-      height: bounds.top + bounds.height - (cropRectRef.current.top + cropRectRef.current.height),
-      fill: 'rgba(0,0,0,0.5)',
-      selectable: false,
-      evented: false,
-      excludeFromExport: true
-    });
-    
-    const overlay3 = new fabric.Rect({
-      left: bounds.left,
-      top: cropRectRef.current.top,
-      width: cropRectRef.current.left - bounds.left,
-      height: cropRectRef.current.height,
-      fill: 'rgba(0,0,0,0.5)',
-      selectable: false,
-      evented: false,
-      excludeFromExport: true
-    });
-    
-    const overlay4 = new fabric.Rect({
-      left: cropRectRef.current.left + cropRectRef.current.width,
-      top: cropRectRef.current.top,
-      width: bounds.left + bounds.width - (cropRectRef.current.left + cropRectRef.current.width),
-      height: cropRectRef.current.height,
-      fill: 'rgba(0,0,0,0.5)',
-      selectable: false,
-      evented: false,
-      excludeFromExport: true
-    });
-    
-    // Add to canvas
-    canvas.add(overlay1, overlay2, overlay3, overlay4, cropRectRef.current);
-    canvas.setActiveObject(cropRectRef.current);
-    canvas.renderAll();
-    
-    // Store references for cleanup
-    overlaysRef.current = [overlay1, overlay2, overlay3, overlay4];
-    
-    // Add event listener to update overlays when crop box moves
+    // Update overlays when crop box moves
+    const updateOverlays = () => createOverlays(cropRectRef.current);
     cropRectRef.current.on('moving', updateOverlays);
     cropRectRef.current.on('scaling', updateOverlays);
-  }, [canvas, aspectRatio, updateOverlays, removeCropBox]);
-
-  // Crop background image
-  const cropBackgroundImage = useCallback((cropData) => {
-    if (!canvas) return;
-    const bgImg = canvas.backgroundImage;
-    if (!bgImg) return;
     
-    // Get the actual image element
-    const imgElement = bgImg._element || bgImg._originalElement;
-    if (!imgElement) {
-      console.error('Image element not found');
-      return;
-    }
-    
-    // Calculate scale factors between displayed and original image
-    const bgBounds = bgImg.getBoundingRect();
-    const scaleX = imgElement.width / bgBounds.width;
-    const scaleY = imgElement.height / bgBounds.height;
-    
-    // Calculate crop area on original image
-    const originalCropData = {
-      left: (cropData.left - bgBounds.left) * scaleX,
-      top: (cropData.top - bgBounds.top) * scaleY,
-      width: cropData.width * scaleX,
-      height: cropData.height * scaleY
-    };
-    
-    // Create new canvas for cropping
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = originalCropData.width;
-    cropCanvas.height = originalCropData.height;
-    const cropCtx = cropCanvas.getContext('2d');
-    
-    // Draw cropped portion from original image
-    cropCtx.drawImage(
-      imgElement,
-      Math.max(0, originalCropData.left), 
-      Math.max(0, originalCropData.top), 
-      originalCropData.width, 
-      originalCropData.height,
-      0, 0, 
-      originalCropData.width, 
-      originalCropData.height
-    );
-    
-    // Create new fabric image from cropped canvas
-    fabric.Image.fromURL(cropCanvas.toDataURL(), (newImg) => {
-      // Scale the new image to fit the crop area
-      newImg.set({
-        left: 0,
-        top: 0,
-        scaleX: cropData.width / originalCropData.width,
-        scaleY: cropData.height / originalCropData.height,
-        selectable: false,
-        evented: false
-      });
-      
-      // Resize canvas to match cropped area
-      canvas.setWidth(cropData.width);
-      canvas.setHeight(cropData.height);
-      
-      // Set cropped image as new background
-      canvas.setBackgroundImage(newImg, () => {
-        canvas.renderAll();
-        console.log('🔲 Background image cropped and canvas resized');
-      });
-    });
-  }, [canvas]);
-
-  // Crop regular image object
-  const cropImageObject = useCallback((imageObj, cropData) => {
-    if (!canvas) return;
-    // Get the actual image element
-    const imgElement = imageObj._element || imageObj._originalElement;
-    if (!imgElement) {
-      console.error('Image element not found');
-      return;
-    }
-    
-    // Calculate scale factors
-    const objBounds = imageObj.getBoundingRect();
-    const scaleX = imgElement.width / objBounds.width;
-    const scaleY = imgElement.height / objBounds.height;
-    
-    // Calculate crop area on original image
-    const originalCropData = {
-      left: (cropData.left - objBounds.left) * scaleX,
-      top: (cropData.top - objBounds.top) * scaleY,
-      width: cropData.width * scaleX,
-      height: cropData.height * scaleY
-    };
-    
-    // Create cropped version
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = originalCropData.width;
-    cropCanvas.height = originalCropData.height;
-    const cropCtx = cropCanvas.getContext('2d');
-    
-    // Draw cropped portion
-    cropCtx.drawImage(
-      imgElement,
-      Math.max(0, originalCropData.left), 
-      Math.max(0, originalCropData.top), 
-      originalCropData.width, 
-      originalCropData.height,
-      0, 0, 
-      originalCropData.width, 
-      originalCropData.height
-    );
-    
-    // Replace with cropped image
-    fabric.Image.fromURL(cropCanvas.toDataURL(), (newImg) => {
-      newImg.set({
-        left: cropData.left,
-        top: cropData.top,
-        scaleX: cropData.width / originalCropData.width,
-        scaleY: cropData.height / originalCropData.height,
-        angle: imageObj.angle,
-        selectable: true,
-        evented: true
-      });
-      
-      canvas.remove(imageObj);
-      canvas.add(newImg);
-      canvas.renderAll();
-      console.log('🔲 Image object cropped successfully');
-    });
-  }, [canvas]);
+    canvas.setActiveObject(cropRectRef.current);
+    canvas.renderAll();
+  }, [canvas, removeCropBox, createOverlays]);
 
   // Start crop mode
   const startCropMode = useCallback(() => {
-    console.log('🔲 startCropMode called - canvas:', !!canvas, 'isActive:', isActive);
-    if (!canvas || !isActive) {
-      console.warn('❌ Cannot start crop mode - missing canvas or not active');
-      return;
-    }
+    if (!canvas || !isActive) return;
+    
     setCropMode(true);
-    console.log('🔲 cropMode set to true');
-  }, [canvas, isActive]);
+    canvas.isDrawingMode = false;
+    canvas.selection = false;
+    canvas.defaultCursor = 'crosshair';
+    canvas.hoverCursor = 'crosshair';
+    
+    // Create default crop box in center
+    const centerX = canvas.width * 0.25;
+    const centerY = canvas.height * 0.25;
+    const cropWidth = canvas.width * 0.5;
+    const cropHeight = canvas.height * 0.5;
+    
+    createCropBox(centerX, centerY, cropWidth, cropHeight);
+  }, [canvas, isActive, createCropBox]);
 
   // Cancel crop mode
   const cancelCropMode = useCallback(() => {
     setCropMode(false);
     removeCropBox();
-  }, [removeCropBox]);
+    canvas.selection = true;
+    canvas.defaultCursor = 'default';
+    canvas.hoverCursor = 'move';
+  }, [removeCropBox, canvas]);
 
-  // Expose methods to parent component
+  // Apply crop
+  const applyCrop = useCallback(() => {
+    if (!cropRectRef.current || !canvas?.backgroundImage) return;
+    
+    const cropRect = cropRectRef.current;
+    const bgImage = canvas.backgroundImage;
+    const imgElement = bgImage._element || bgImage._originalElement;
+    
+    if (!imgElement) return;
+    
+    // Save original state
+    saveOriginalState();
+    
+    // Get actual crop dimensions
+    const actualWidth = cropRect.width * cropRect.scaleX;
+    const actualHeight = cropRect.height * cropRect.scaleY;
+    
+    // Calculate scale factors from canvas to original image
+    const originalWidth = imgElement.naturalWidth || imgElement.width;
+    const originalHeight = imgElement.naturalHeight || imgElement.height;
+    const scaleX = originalWidth / canvas.width;
+    const scaleY = originalHeight / canvas.height;
+    
+    // Convert crop coordinates to original image coordinates
+    const cropData = {
+      left: cropRect.left * scaleX,
+      top: cropRect.top * scaleY,
+      width: actualWidth * scaleX,
+      height: actualHeight * scaleY
+    };
+    
+    // Ensure crop is within image bounds
+    const clampedCrop = {
+      left: Math.max(0, Math.min(cropData.left, originalWidth)),
+      top: Math.max(0, Math.min(cropData.top, originalHeight)),
+      width: Math.min(cropData.width, originalWidth - Math.max(0, cropData.left)),
+      height: Math.min(cropData.height, originalHeight - Math.max(0, cropData.top))
+    };
+    
+    // Create crop canvas
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = Math.max(1, Math.round(clampedCrop.width));
+    cropCanvas.height = Math.max(1, Math.round(clampedCrop.height));
+    const cropCtx = cropCanvas.getContext('2d');
+    
+    // Enable high quality image smoothing
+    cropCtx.imageSmoothingEnabled = true;
+    cropCtx.imageSmoothingQuality = 'high';
+    
+    // Draw cropped portion
+    cropCtx.drawImage(
+      imgElement,
+      Math.round(clampedCrop.left),
+      Math.round(clampedCrop.top),
+      Math.round(clampedCrop.width),
+      Math.round(clampedCrop.height),
+      0, 0,
+      Math.round(clampedCrop.width),
+      Math.round(clampedCrop.height)
+    );
+    
+    // Create new fabric image
+    fabric.Image.fromURL(cropCanvas.toDataURL(), (newImg) => {
+      newImg.set({
+        left: 0,
+        top: 0,
+        scaleX: 1,
+        scaleY: 1,
+        selectable: false,
+        evented: false
+      });
+      
+      // Resize canvas to match crop
+      canvas.setWidth(actualWidth);
+      canvas.setHeight(actualHeight);
+      
+      const htmlCanvas = canvas.getElement();
+      if (htmlCanvas) {
+        htmlCanvas.width = actualWidth;
+        htmlCanvas.height = actualHeight;
+        htmlCanvas.style.width = `${actualWidth}px`;
+        htmlCanvas.style.height = `${actualHeight}px`;
+      }
+      
+      // Set new background image
+      canvas.setBackgroundImage(newImg, () => {
+        canvas.renderAll();
+        cancelCropMode();
+        
+        // Dispatch resize event
+        window.dispatchEvent(new CustomEvent('canvasResized', {
+          detail: { width: actualWidth, height: actualHeight, canvas }
+        }));
+      });
+    });
+  }, [canvas, saveOriginalState, cancelCropMode]);
+
+  // Mouse event handlers for free drawing
+  const handleMouseDown = useCallback((e) => {
+    if (!cropMode || aspectRatio !== 'free' || !canvas) return;
+    
+    const pointer = canvas.getPointer(e.e);
+    setIsDrawing(true);
+    setStartPoint(pointer);
+    removeCropBox();
+  }, [cropMode, aspectRatio, canvas, removeCropBox]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!cropMode || aspectRatio !== 'free' || !isDrawing || !startPoint || !canvas) return;
+    
+    const pointer = canvas.getPointer(e.e);
+    const left = Math.min(startPoint.x, pointer.x);
+    const top = Math.min(startPoint.y, pointer.y);
+    const width = Math.abs(pointer.x - startPoint.x);
+    const height = Math.abs(pointer.y - startPoint.y);
+    
+    if (width > 10 && height > 10) {
+      removeCropBox();
+      createCropBox(left, top, width, height);
+    }
+  }, [cropMode, aspectRatio, isDrawing, startPoint, canvas, removeCropBox, createCropBox]);
+
+  const handleMouseUp = useCallback((e) => {
+    if (!cropMode || aspectRatio !== 'free' || !isDrawing || !canvas) return;
+    
+    setIsDrawing(false);
+    setStartPoint(null);
+    
+    if (cropRectRef.current) {
+      cropRectRef.current.set({ selectable: true, evented: true });
+      canvas.renderAll();
+    }
+  }, [cropMode, aspectRatio, isDrawing, canvas]);
+
+  // Expose methods to parent
   useImperativeHandle(ref, () => ({
     togglePanel: () => setShowPanel(prev => !prev),
     showPanel: () => setShowPanel(true),
     hidePanel: () => setShowPanel(false),
     startCrop: startCropMode,
-    cancelCrop: cancelCropMode
-  }), [startCropMode, cancelCropMode]);
+    cancelCrop: cancelCropMode,
+    undoCrop: undoCrop,
+    canUndo: canUndo
+  }), [startCropMode, cancelCropMode, undoCrop, canUndo]);
 
   // Auto-start crop mode when tool becomes active
   useEffect(() => {
-    if (!canvas || !isActive) return;
-    
-    console.log('🔲 CropTool activated - auto-starting crop mode');
-    // Automatically start crop mode when tool is selected
+    if (canvas && isActive) {
     startCropMode();
+    }
   }, [canvas, isActive, startCropMode]);
 
-  // Crop implementation
+  // Setup mouse event listeners
   useEffect(() => {
-    if (!canvas || !isActive) return;
+    if (!canvas || !cropMode) return;
     
-    if (cropMode) {
-      console.log('🔲 Starting crop mode...');
-      // Disable selection and drawing
-      canvas.isDrawingMode = false;
-      canvas.selection = false;
-      canvas.defaultCursor = 'crosshair';
-      canvas.hoverCursor = 'crosshair';
-      
-      // Find the background image to crop
-      const bgImage = canvas.backgroundImage || findLargestImage();
-      console.log('🔲 Background image found:', !!bgImage, 'Type:', bgImage?.type);
-      
-      if (!bgImage) {
-        console.warn('❌ No image found to crop');
-        return;
-      }
-      
-      originalImageRef.current = bgImage;
-      createCropBox(bgImage);
-      
-      console.log('✅ Crop mode activated successfully');
-      
-    } else {
-      console.log('🔲 Cleaning up crop mode...');
-      // Clean up crop mode
-      removeCropBox();
-      canvas.selection = true;
-      canvas.defaultCursor = 'default';
-      canvas.hoverCursor = 'move';
-      console.log('✅ Crop mode cleaned up');
-    }
-  }, [cropMode, canvas, isActive, findLargestImage, createCropBox, removeCropBox]);
-
-  // Apply crop
-  const applyCrop = useCallback(() => {
-    console.log('🔲 applyCrop called');
-    console.log('🔲 cropRectRef.current:', !!cropRectRef.current);
-    console.log('🔲 originalImageRef.current:', !!originalImageRef.current);
-    
-    if (!cropRectRef.current || !originalImageRef.current || !canvas) {
-      console.warn('❌ applyCrop: Missing crop rect, original image, or canvas');
-      return;
+      if (aspectRatio === 'free') {
+      canvas.on('mouse:down', handleMouseDown);
+      canvas.on('mouse:move', handleMouseMove);
+      canvas.on('mouse:up', handleMouseUp);
     }
     
-    const cropRect = cropRectRef.current;
-    const targetImage = originalImageRef.current;
-    
-    // Get actual crop box dimensions (including scaling)
-    const actualWidth = cropRect.width * cropRect.scaleX;
-    const actualHeight = cropRect.height * cropRect.scaleY;
-    
-    // Get crop coordinates relative to the image
-    const cropData = {
-      left: cropRect.left,
-      top: cropRect.top,
-      width: actualWidth,
-      height: actualHeight
+    return () => {
+      canvas.off('mouse:down', handleMouseDown);
+      canvas.off('mouse:move', handleMouseMove);
+      canvas.off('mouse:up', handleMouseUp);
     };
-    
-    console.log('🔲 Applying crop:', cropData);
-    console.log('🔲 Target image type:', targetImage === canvas.backgroundImage ? 'background' : 'object');
-    
-    // Create cropped image
-    if (canvas.backgroundImage === targetImage) {
-      // Crop background image
-      cropBackgroundImage(cropData);
-    } else {
-      // Crop regular image object
-      cropImageObject(targetImage, cropData);
-    }
-    
-    // Exit crop mode
-    cancelCropMode();
-  }, [canvas, cancelCropMode, cropBackgroundImage, cropImageObject]);
+  }, [canvas, cropMode, aspectRatio, handleMouseDown, handleMouseMove, handleMouseUp]);
 
   // Aspect ratio presets
   const aspectRatios = [
@@ -478,8 +392,6 @@ const CropTool = forwardRef(({ canvas, isActive }, ref) => {
     { value: '16:9', label: '16:9', icon: Square },
     { value: '4:3', label: '4:3', icon: Square }
   ];
-
-  console.log('🔲 CropTool rendering - showPanel:', showPanel, 'cropMode:', cropMode);
   
   return (
     <div className="crop-tool p-3 border-t border-gray-200 bg-white shadow-lg">
@@ -488,10 +400,7 @@ const CropTool = forwardRef(({ canvas, isActive }, ref) => {
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-gray-700">🔲 Crop Tool</span>
           <button
-            onClick={() => {
-              console.log('🔲 Settings button clicked');
-              setShowPanel(true);
-            }}
+            onClick={() => setShowPanel(true)}
             className="px-2 py-1 bg-blue-500 text-white rounded text-xs hover:bg-blue-600"
           >
             Settings
@@ -503,6 +412,15 @@ const CropTool = forwardRef(({ canvas, isActive }, ref) => {
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-blue-700">🔲 Crop Mode Active</span>
             <div className="flex gap-1">
+              {canUndo && (
+                <button
+                  onClick={undoCrop}
+                  className="px-2 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600"
+                  title="Undo Last Crop"
+                >
+                  <Undo2 size={12} />
+                </button>
+              )}
               <button
                 onClick={applyCrop}
                 className="px-2 py-1 bg-green-500 text-white rounded text-xs hover:bg-green-600"
@@ -521,7 +439,10 @@ const CropTool = forwardRef(({ canvas, isActive }, ref) => {
           </div>
           
           <div className="text-xs text-blue-600 mb-2">
-            Drag the crop area to adjust. Click ✓ to apply or ✕ to cancel.
+            {aspectRatio === 'free' 
+              ? 'Click and drag to draw crop area, then drag to adjust. Click ✓ to apply or ✕ to cancel.'
+              : 'Drag the crop area to adjust. Click ✓ to apply or ✕ to cancel.'
+            }
           </div>
           
           {/* Aspect Ratio Controls */}
@@ -535,7 +456,7 @@ const CropTool = forwardRef(({ canvas, isActive }, ref) => {
                     setAspectRatio(ratio.value);
                     if (cropRectRef.current) {
                       removeCropBox();
-                      createCropBox(originalImageRef.current);
+                      startCropMode();
                     }
                   }}
                   className={`px-2 py-1 text-xs rounded ${
@@ -566,15 +487,22 @@ const CropTool = forwardRef(({ canvas, isActive }, ref) => {
           {/* Main Actions */}
           <div className="mb-4">
             <button
-              onClick={() => {
-                console.log('🔲 Start Crop button clicked!');
-                startCropMode();
-              }}
+              onClick={startCropMode}
               className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
             >
               <Crop size={16} />
               <span className="text-sm">Start Crop</span>
             </button>
+            
+            {canUndo && (
+              <button
+                onClick={undoCrop}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors mt-2"
+              >
+                <Undo2 size={16} />
+                <span className="text-sm">Undo Last Crop</span>
+              </button>
+            )}
           </div>
           
           {/* Aspect Ratio Selection */}

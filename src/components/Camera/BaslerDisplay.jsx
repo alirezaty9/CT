@@ -90,11 +90,15 @@ const BaslerDisplay = () => {
     console.log('🖼️ Updating Fabric.js background image');
 
     fabric.Image.fromURL(currentFrame, (img) => {
+      // Use current canvas dimensions if available, otherwise default to 640x480
+      const currentWidth = fabricCanvasRef.current.width || 640;
+      const currentHeight = fabricCanvasRef.current.height || 480;
+      
       img.set({
         left: 0,
         top: 0,
-        scaleX: 640 / img.width,
-        scaleY: 480 / img.height,
+        scaleX: currentWidth / img.width,
+        scaleY: currentHeight / img.height,
         selectable: false,
         evented: false,
         excludeFromExport: false
@@ -266,6 +270,32 @@ const BaslerDisplay = () => {
       updateFabricBackground();
     }
   }, [cameras.basler.currentFrame]); // Only when frame changes, not settings
+
+  // Listen for canvas resize events (e.g., after crop)
+  useEffect(() => {
+    const handleCanvasResize = (event) => {
+      console.log('🔲 Canvas resize event received:', event.detail);
+      
+      // Update HTML canvas element dimensions
+      if (canvasRef.current && event.detail) {
+        canvasRef.current.width = event.detail.width;
+        canvasRef.current.height = event.detail.height;
+        canvasRef.current.style.width = `${event.detail.width}px`;
+        canvasRef.current.style.height = `${event.detail.height}px`;
+        console.log('🔲 HTML canvas updated to:', event.detail.width, 'x', event.detail.height);
+      }
+      
+      // Force re-render to update mouse coordinates
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.renderAll();
+      }
+    };
+
+    window.addEventListener('canvasResized', handleCanvasResize);
+    return () => {
+      window.removeEventListener('canvasResized', handleCanvasResize);
+    };
+  }, []);
 
   // اضافی: اطمینان از render شدن canvas
   useEffect(() => {
@@ -474,16 +504,26 @@ const BaslerDisplay = () => {
     const clientX = e.clientX - rect.left;
     const clientY = e.clientY - rect.top;
     
+    // استفاده از Fabric.js canvas dimensions اگر موجود باشد
+    const fabricCanvas = fabricCanvasRef.current;
+    const canvasWidth = fabricCanvas ? fabricCanvas.width : canvas.width;
+    const canvasHeight = fabricCanvas ? fabricCanvas.height : canvas.height;
+    
+    // Debug log only when dimensions change significantly
+    if (Math.abs(canvasWidth - canvas.width) > 10 || Math.abs(canvasHeight - canvas.height) > 10) {
+      console.log('🔲 Canvas dimensions mismatch - Fabric:', canvasWidth, 'x', canvasHeight, 'HTML:', canvas.width, 'x', canvas.height);
+    }
+    
     // تبدیل دقیق به مختصات canvas با در نظر گیری scaling
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const scaleX = canvasWidth / rect.width;
+    const scaleY = canvasHeight / rect.height;
     
     const rawX = clientX * scaleX;
     const rawY = clientY * scaleY;
     
     // محدود کردن مختصات به داخل canvas
-    const clampedRawX = Math.max(0, Math.min(canvas.width, rawX));
-    const clampedRawY = Math.max(0, Math.min(canvas.height, rawY));
+    const clampedRawX = Math.max(0, Math.min(canvasWidth, rawX));
+    const clampedRawY = Math.max(0, Math.min(canvasHeight, rawY));
     
     // تصحیح موقعیت با در نظر گیری zoom و pan
     const x = (clampedRawX - imageSettings.panOffset.x) / imageSettings.zoom;
@@ -549,11 +589,17 @@ const BaslerDisplay = () => {
           const naturalWidth = img.naturalWidth || 640;
           const naturalHeight = img.naturalHeight || 480;
           
-          // Set canvas size to match the actual image resolution
-          canvas.width = naturalWidth;
-          canvas.height = naturalHeight;
-          
-          console.log(`📸 Basler frame loaded: ${naturalWidth}x${naturalHeight}`);
+          // Only resize HTML canvas if Fabric.js canvas hasn't been resized (e.g., after crop)
+          const fabricCanvas = fabricCanvasRef.current;
+          if (!fabricCanvas || (fabricCanvas.width === 640 && fabricCanvas.height === 480)) {
+            // Set canvas size to match the actual image resolution
+            canvas.width = naturalWidth;
+            canvas.height = naturalHeight;
+            console.log(`📸 Basler frame loaded: ${naturalWidth}x${naturalHeight}`);
+          } else {
+            // Keep current dimensions if canvas was resized (e.g., after crop)
+            console.log(`📸 Basler frame loaded but keeping current canvas size: ${canvas.width}x${canvas.height}`);
+          }
         }
         redrawCanvas();
       };
