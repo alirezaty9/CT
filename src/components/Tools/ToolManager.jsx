@@ -4,6 +4,7 @@ import EraserTool from './EraserTool.jsx';
 import LineTool from './LineTool.jsx';
 import MoveTool from './MoveTool.jsx';
 import CropTool from './CropTool.jsx';
+import ZoomTool from './ZoomTool.jsx';
 
 const ToolManager = ({ 
   canvas, 
@@ -56,6 +57,14 @@ const ToolManager = ({
       case 'move':
         return (
           <MoveTool
+            canvas={canvas}
+            isActive={true}
+          />
+        );
+      
+      case 'zoom':
+        return (
+          <ZoomTool
             canvas={canvas}
             isActive={true}
           />
@@ -166,6 +175,16 @@ const ToolManager = ({
             }`}
           >
             🖱️ Move
+          </button>
+          <button
+            onClick={() => onToolChange('zoom')}
+            className={`px-3 py-2 rounded text-sm ${
+              activeTool === 'zoom' 
+                ? 'bg-teal-500 text-white' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            }`}
+          >
+            🔍 Zoom
           </button>
         </div>
       </div>

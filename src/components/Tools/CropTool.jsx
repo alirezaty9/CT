@@ -279,9 +279,15 @@ const CropTool = forwardRef(({ canvas, isActive }, ref) => {
     
     // Create new fabric image
     fabric.Image.fromURL(cropCanvas.toDataURL(), (newImg) => {
+      // Center the image in the canvas
+      const centerX = actualWidth / 2;
+      const centerY = actualHeight / 2;
+      
       newImg.set({
-        left: 0,
-        top: 0,
+        left: centerX,
+        top: centerY,
+        originX: 'center',
+        originY: 'center',
         scaleX: 1,
         scaleY: 1,
         selectable: false,

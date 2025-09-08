@@ -486,7 +486,7 @@ const SimpleCanvas = ({
 
       {/* ناحیه canvas */}
       <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-        <div className="relative bg-white rounded-lg shadow-lg">
+        <div className="relative bg-white rounded-lg shadow-lg flex justify-center items-center">
           <canvas
             ref={canvasRef}
             className="border border-gray-300 rounded-lg"

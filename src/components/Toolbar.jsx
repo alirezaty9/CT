@@ -30,6 +30,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { ToolManager } from './Tools';
 import { BrushTool, LineTool, MoveTool, CropTool } from './Tools';
+import ZoomTool from './Tools/ZoomTool.jsx';
 import EraseToolComponent from './Tools/EraseToolComponent';
 
 // CSS for hiding scrollbar
@@ -60,8 +61,7 @@ const tools = [
   { Icon: Minus, name: 'line', hotkey: 'l', category: 'shape' },
   { Icon: LineChart, name: 'lineChart', hotkey: 'shift+l', category: 'shape' },
   { Icon: Move, name: 'move', hotkey: 'v', category: 'nav' },
-  { Icon: ZoomIn, name: 'zoomIn', hotkey: 'plus', category: 'view' },
-  { Icon: ZoomOut, name: 'zoomOut', hotkey: 'minus', category: 'view' },
+  { Icon: ZoomIn, name: 'zoom', hotkey: 'z', category: 'view' },
   { Icon: Palette, name: 'grayscale', hotkey: 'g', category: 'filter' },
   { Icon: Hand, name: 'pan', hotkey: 'space', category: 'nav' },
   { Icon: RotateCcw, name: 'undo', hotkey: 'ctrl+z', category: 'edit' }
@@ -131,10 +131,8 @@ const Toolbar = ({ className = '' }) => {
     
     if (name === 'grayscale') {
       toggleGrayscale();
-    } else if (name === 'zoomIn') {
-      zoomImage('in');
-    } else if (name === 'zoomOut') {
-      zoomImage('out');
+    } else if (name === 'zoom') {
+      applyTool(name);
     } else if (name === 'undo') {
       undoLastChange();
     } else if (name === 'eraser') {
@@ -557,6 +555,16 @@ const Toolbar = ({ className = '' }) => {
           <CropTool
             canvas={canvas}
             isActive={activeTool === 'crop'}
+          />
+        </div>
+      )}
+      
+      {/* Zoom Tool - Visible when active */}
+      {activeTool === 'zoom' && canvas && (
+        <div className="absolute left-full top-0 ml-2 z-50">
+          <ZoomTool
+            canvas={canvas}
+            isActive={activeTool === 'zoom'}
           />
         </div>
       )}

@@ -626,13 +626,13 @@ const BaslerDisplay = () => {
   }, []);
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-black rounded-lg overflow-hidden relative">
+    <div ref={containerRef} className="w-full h-full bg-black rounded-lg overflow-hidden relative flex justify-center items-center">
       <img ref={imageRef} style={{ display: 'none' }} alt="Basler frame" />
       <canvas
         ref={canvasRef}
         width={640}
         height={480}
-        className="w-full h-full object-contain cursor-crosshair"
+        className="w-full h-full object-contain cursor-crosshair  mx-auto "
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
